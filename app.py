@@ -3,6 +3,7 @@ import re
 import shutil
 import hashlib
 import datetime
+import traceback
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 from dotenv import load_dotenv
@@ -143,6 +144,7 @@ def upload_file():
         })
     except Exception as e:
         # Clean up input file if pipeline fails
+        traceback.print_exc()
         if os.path.exists(pdf_path):
             os.remove(pdf_path)
         return jsonify({"error": str(e)}), 500
@@ -214,6 +216,7 @@ def get_attendance():
                                 "ot": day_vals.get("ot", "")
                             }
         except Exception as e:
+            traceback.print_exc()
             return jsonify({"error": f"Error parsing excel file: {str(e)}"}), 500
             
     return jsonify({
