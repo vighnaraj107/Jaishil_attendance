@@ -20,6 +20,11 @@ app = Flask(__name__)
 # Enable CORS for all routes (necessary for Vercel -> Render communication)
 CORS(app)
 
+
+@app.route("/", methods=["GET"])
+def health_check():
+    return jsonify({"status": "healthy", "service": "jaishil-attendance"}), 200
+
 # Ensure folders exist
 os.makedirs("input_pdfs", exist_ok=True)
 os.makedirs("processed_pdfs", exist_ok=True)
