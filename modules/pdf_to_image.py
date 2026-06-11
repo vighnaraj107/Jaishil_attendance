@@ -6,12 +6,19 @@ def convert_pdf_to_images(pdf_path, output_folder):
 
     os.makedirs(output_folder, exist_ok=True)
 
-    # Higher DPI = better detail for handwriting
-    pages = convert_from_path(
-        pdf_path,
-        dpi=400,
-        poppler_path=r"C:\poppler-26.02.0\Library\bin"   # WINDOWS ONLY
-    )
+    # Use poppler_path only on Windows if it exists
+    win_poppler_path = r"C:\poppler-26.02.0\Library\bin"
+    if os.name == 'nt' and os.path.exists(win_poppler_path):
+        pages = convert_from_path(
+            pdf_path,
+            dpi=400,
+            poppler_path=win_poppler_path
+        )
+    else:
+        pages = convert_from_path(
+            pdf_path,
+            dpi=400
+        )
 
     image_paths = []
 
