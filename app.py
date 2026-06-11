@@ -324,7 +324,8 @@ def get_files():
 
 @app.route("/api/download/<filename>", methods=["GET"])
 def download_file(filename):
-    return send_from_directory("output_excels", filename, as_attachment=True)
+    directory = os.path.abspath("output_excels")
+    return send_from_directory(directory, filename, as_attachment=True)
 
 
 if __name__ == "__main__":

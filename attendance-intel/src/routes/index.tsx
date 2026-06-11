@@ -251,12 +251,13 @@ function RecentFiles({ files, loading }: { files: any[], loading: boolean }) {
                   </div>
                 </div>
               </div>
-              <button 
-                onClick={() => f.downloadUrl ? window.open(f.downloadUrl, "_blank") : window.open(`${api.base}/api/download/${f.name}`, "_blank")}
+              <a 
+                href={f.downloadUrl || `${api.base}/api/download/${f.name}`}
+                download
                 className="mt-3 w-full gradient-navy text-white text-sm font-medium py-2 rounded-lg flex items-center justify-center gap-2 hover:opacity-95 transition-opacity"
               >
                 <Download className="size-4" /> Download Excel
-              </button>
+              </a>
             </div>
           ))}
         </div>
