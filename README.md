@@ -105,3 +105,10 @@ jaishil-attendance/
 - **Backend Stack**: Flask, Openpyxl, OpenCV, Pillow, PyMuPDF/pdf2image, Anthropic SDK.
 - **Frontend Stack**: React, Vite, Tailwind CSS, Lucide Icons, Shadcn/ui, TanStack.
 - **OCR Engine**: Claude-3 Sonnet/Haiku via image vision processing, with fallback date detection from filename.
+
+---
+
+## Author
+
+- **Vighnaraj** ([@vighnaraj107](https://github.com/vighnaraj107))
+
