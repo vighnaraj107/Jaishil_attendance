@@ -10,3 +10,4 @@ rapidfuzz
 Flask
 flask-cors
 python-dotenv
+anthropic
