@@ -11,13 +11,13 @@ def convert_pdf_to_images(pdf_path, output_folder):
     if os.name == 'nt' and os.path.exists(win_poppler_path):
         pages = convert_from_path(
             pdf_path,
-            dpi=400,
+            dpi=150,
             poppler_path=win_poppler_path
         )
     else:
         pages = convert_from_path(
             pdf_path,
-            dpi=400
+            dpi=150
         )
 
     image_paths = []
