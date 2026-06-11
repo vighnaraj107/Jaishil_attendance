@@ -110,5 +110,5 @@ jaishil-attendance/
 
 ## Author
 
-- **Vighnaraj** ([@vighnaraj107](https://github.com/vighnaraj107))
+- **Vighnaraj kakade** ([@vighnaraj107](https://github.com/vighnaraj107))
 
