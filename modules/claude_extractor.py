@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-client = Anthropic(api_key=os.getenv("CLAUDE_API_KEY"))
+client = Anthropic(api_key=os.getenv("CLAUDE_API_KEY") or os.getenv("ANTHROPIC_API_KEY"))
 
 # ── Known contractor names ─────────────────────────────────────────────────────
 # Claude is instructed to match against this list so it never invents new names.
@@ -71,7 +71,7 @@ RULES:
         try:
 
             message = client.messages.create(
-                model="claude-sonnet-4-6",
+                model="claude-3-5-sonnet-20241022",
                 max_tokens=4000,
                 temperature=0,
                 messages=[
