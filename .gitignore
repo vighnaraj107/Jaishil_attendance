@@ -1,0 +1,52 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.venv/
+env/
+ENV/
+*.xlsx
+*.pdf
+
+# Environment Variables
+.env
+.env.local
+.env.*.local
+
+# IDEs and Editors
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+.DS_Store
+Thumbs.db
+
+# Frontend (attendance-intel)
+attendance-intel/node_modules/
+attendance-intel/dist/
+attendance-intel/dist-ssr/
+attendance-intel/.output/
+attendance-intel/.vinxi/
+attendance-intel/.tanstack/
+attendance-intel/.nitro/
+attendance-intel/*.local
+
+# Local Data and Output Directories (Ignore content, keep folder structure via .gitkeep)
+input_pdfs/*
+!input_pdfs/.gitkeep
+
+ocr_output/*
+!ocr_output/.gitkeep
+
+output_excels/*
+!output_excels/.gitkeep
+
+processed_pdfs/*
+!processed_pdfs/.gitkeep
+
+temp_images/*
+!temp_images/.gitkeep

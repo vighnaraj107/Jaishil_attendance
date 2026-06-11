@@ -1,0 +1,12 @@
+pdf2image
+paddleocr
+paddlepaddle
+opencv-python
+pandas
+openpyxl
+pillow
+numpy
+rapidfuzz
+Flask
+flask-cors
+python-dotenv
