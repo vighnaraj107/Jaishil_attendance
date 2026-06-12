@@ -1,52 +1,12 @@
-// Mock data for the Contractor Attendance Dashboard
-export type Shift = "DAY" | "NIGHT";
-
-export interface Contractor {
-  id: string;
-  name: string;
-  employees: number;
-  color: string;
-}
-
-export interface Employee {
-  id: string;
-  name: string;
-  contractorId: string;
-  shift: Shift;
-}
-
-// entry per (employeeId, day) -> { in, out, ot }
-export interface AttendanceEntry {
-  in?: string;
-  out?: string;
-  ot?: string; // HH:MM
-}
-export type AttendanceMap = Record<string, Record<number, AttendanceEntry>>;
-
-export interface OutputFile {
-  name: string;
-  size: string;
-  generatedAt: string;
-  records: number;
-}
-
-export interface MappingRule {
-  id: string;
-  raw: string;
-  canonical: string;
-  scope: "contractor" | "employee";
-}
-
-export const contractors: Contractor[] = [
+const contractors = [
   { id: "shyam", name: "Shri Shyam", employees: 12, color: "var(--navy)" },
   { id: "ayush", name: "Ayush", employees: 7, color: "var(--teal-brand)" },
   { id: "laxmi", name: "Shri Laxmi", employees: 9, color: "var(--emerald-brand)" },
   { id: "ansh", name: "Ansh", employees: 6, color: "var(--warning)" },
   { id: "radha", name: "Shri Radha", employees: 8, color: "var(--slate-cool)" },
-  { id: "jaishil", name: "Jaishil Sulphur and Chemical Industries", employees: 6, color: "var(--navy-deep)" },
+  { id: "jaishil", name: "Jaishil Sulphur and Chemical Industries", employees: 6, color: "var(--navy-deep)" }
 ];
-
-export const employees: Employee[] = [
+const employees = [
   { id: "e1", name: "Sachin Tyagi", contractorId: "shyam", shift: "DAY" },
   { id: "e2", name: "Rajesh Kumar", contractorId: "shyam", shift: "DAY" },
   { id: "e3", name: "Mohit Sharma", contractorId: "shyam", shift: "NIGHT" },
@@ -56,17 +16,16 @@ export const employees: Employee[] = [
   { id: "e7", name: "Dinesh", contractorId: "ansh", shift: "NIGHT" },
   { id: "e8", name: "Pawan", contractorId: "ayush", shift: "DAY" },
   { id: "e9", name: "Lokesh", contractorId: "radha", shift: "DAY" },
-  { id: "e10", name: "Hari Om", contractorId: "jaishil", shift: "NIGHT" },
+  { id: "e10", name: "Hari Om", contractorId: "jaishil", shift: "NIGHT" }
 ];
-
-function genAttendance(): AttendanceMap {
-  const map: AttendanceMap = {};
-  const times: Array<[string, string, string]> = [
+function genAttendance() {
+  const map = {};
+  const times = [
     ["08:00", "20:00", "02:00"],
     ["08:15", "20:05", "01:45"],
     ["07:55", "19:50", "02:30"],
     ["08:05", "20:10", "01:30"],
-    ["08:00", "20:00", "02:00"],
+    ["08:00", "20:00", "02:00"]
   ];
   for (const e of employees) {
     map[e.id] = {};
@@ -77,62 +36,54 @@ function genAttendance(): AttendanceMap {
   }
   return map;
 }
-
-export const attendance: AttendanceMap = genAttendance();
-
-export const outputFiles: OutputFile[] = [
+const attendance = genAttendance();
+const outputFiles = [
   { name: "attendance_2026_05.xlsx", size: "84 KB", generatedAt: "May 4, 2026 · 07:24", records: 218 },
   { name: "attendance_2026_04.xlsx", size: "112 KB", generatedAt: "Apr 30, 2026 · 19:02", records: 286 },
-  { name: "attendance_2026_03.xlsx", size: "108 KB", generatedAt: "Mar 31, 2026 · 21:11", records: 271 },
+  { name: "attendance_2026_03.xlsx", size: "108 KB", generatedAt: "Mar 31, 2026 · 21:11", records: 271 }
 ];
-
-export const mappingRules: MappingRule[] = [
+const mappingRules = [
   { id: "m1", raw: "Anish Grp", canonical: "Ansh", scope: "contractor" },
   { id: "m2", raw: "Sri Shyam", canonical: "Shri Shyam", scope: "contractor" },
   { id: "m3", raw: "Sachin T.", canonical: "Sachin Tyagi", scope: "employee" },
-  { id: "m4", raw: "Vivek Kr", canonical: "Vivek", scope: "employee" },
+  { id: "m4", raw: "Vivek Kr", canonical: "Vivek", scope: "employee" }
 ];
-
-// --- API hooks placeholders ---
-const API_BASE = (typeof window !== "undefined" && localStorage.getItem("apiBase")) || import.meta.env.VITE_API_URL || import.meta.env.VITE_BACKEND_API_URL || "http://localhost:5000";
-
-export const api = {
-  uploadPdf: async (file: File) => {
+const API_BASE = typeof window !== "undefined" && localStorage.getItem("apiBase") || void 0 || void 0 || "http://localhost:5000";
+const api = {
+  uploadPdf: async (file) => {
     try {
       const formData = new FormData();
       formData.append("file", file);
       const res = await fetch(`${API_BASE}/api/upload`, {
         method: "POST",
-        body: formData,
+        body: formData
       });
-      if (!res.ok) {
-        let errMsg = "API error";
-        try {
-          const json = await res.json();
-          errMsg = json.error || json.message || errMsg;
-        } catch {
-          errMsg = await res.text();
-        }
-        throw new Error(errMsg);
-      }
+      if (!res.ok) throw new Error(await res.text());
       return await res.json();
-    } catch (err: any) {
-      if (err.message && (err.message.includes("Failed to fetch") || err.message.includes("NetworkError") || err.message.includes("Failed to connect"))) {
-        console.warn("Backend API upload failed, falling back to mock upload:", err);
-        await new Promise((r) => setTimeout(r, 600));
-        return { ok: true, file: file.name };
-      }
-      throw err;
+    } catch (err) {
+      console.warn("Backend API upload failed, falling back to mock upload:", err);
+      await new Promise((r) => setTimeout(r, 600));
+      return { ok: true, file: file.name };
     }
   },
-  getAttendance: async (month: string) => {
+  getAttendance: async (month) => {
     try {
       let formattedMonth = month;
       if (month.includes(" ")) {
         const [mName, yStr] = month.split(" ");
-        const monthsMap: Record<string, string> = {
-          January: "01", February: "02", March: "03", April: "04", May: "05", June: "06",
-          July: "07", August: "08", September: "09", October: "10", November: "11", December: "12"
+        const monthsMap = {
+          January: "01",
+          February: "02",
+          March: "03",
+          April: "04",
+          May: "05",
+          June: "06",
+          July: "07",
+          August: "08",
+          September: "09",
+          October: "10",
+          November: "11",
+          December: "12"
         };
         const mNum = monthsMap[mName] || "05";
         formattedMonth = `${yStr}_${mNum}`;
@@ -151,14 +102,24 @@ export const api = {
       return { month, attendance, employees, contractors };
     }
   },
-  saveAttendance: async (payload: any) => {
+  saveAttendance: async (payload) => {
     try {
       let formattedMonth = payload.month;
       if (payload.month && payload.month.includes(" ")) {
         const [mName, yStr] = payload.month.split(" ");
-        const monthsMap: Record<string, string> = {
-          January: "01", February: "02", March: "03", April: "04", May: "05", June: "06",
-          July: "07", August: "08", September: "09", October: "10", November: "11", December: "12"
+        const monthsMap = {
+          January: "01",
+          February: "02",
+          March: "03",
+          April: "04",
+          May: "05",
+          June: "06",
+          July: "07",
+          August: "08",
+          September: "09",
+          October: "10",
+          November: "11",
+          December: "12"
         };
         const mNum = monthsMap[mName] || "05";
         formattedMonth = `${yStr}_${mNum}`;
@@ -167,28 +128,16 @@ export const api = {
       const res = await fetch(`${API_BASE}/api/attendance/save`, {
         method: "POST",
         headers: {
-          "Content-Type": "application/json",
+          "Content-Type": "application/json"
         },
-        body: JSON.stringify(apiPayload),
+        body: JSON.stringify(apiPayload)
       });
-      if (!res.ok) {
-        let errMsg = "API error";
-        try {
-          const json = await res.json();
-          errMsg = json.error || json.message || errMsg;
-        } catch {
-          errMsg = await res.text();
-        }
-        throw new Error(errMsg);
-      }
+      if (!res.ok) throw new Error(await res.text());
       return await res.json();
-    } catch (err: any) {
-      if (err.message && (err.message.includes("Failed to fetch") || err.message.includes("NetworkError") || err.message.includes("Failed to connect"))) {
-        console.warn("Backend API saveAttendance failed, falling back to mock save:", err);
-        await new Promise((r) => setTimeout(r, 200));
-        return { ok: true, payload };
-      }
-      throw err;
+    } catch (err) {
+      console.warn("Backend API saveAttendance failed, falling back to mock save:", err);
+      await new Promise((r) => setTimeout(r, 200));
+      return { ok: true, payload };
     }
   },
   getFiles: async () => {
@@ -196,7 +145,7 @@ export const api = {
       const res = await fetch(`${API_BASE}/api/files`);
       if (!res.ok) throw new Error("API error");
       const files = await res.json();
-      return files.map((f: any) => ({
+      return files.map((f) => ({
         ...f,
         downloadUrl: `${API_BASE}/api/download/${f.name}`
       }));
@@ -216,5 +165,10 @@ export const api = {
       return mappingRules;
     }
   },
-  base: API_BASE,
+  base: API_BASE
+};
+export {
+  api as a,
+  contractors as c,
+  mappingRules as m
 };

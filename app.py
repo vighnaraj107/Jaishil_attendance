@@ -48,12 +48,44 @@ def get_employee_id(contractor_name, shift, name):
     return "e_" + hashlib.md5(unique_str.encode('utf-8')).hexdigest()[:8]
 
 
+def normalize_row_date(extracted_date, pdf_date, filename_date_parsed=False):
+    if filename_date_parsed and pdf_date:
+        return pdf_date
+    if not pdf_date:
+        return extracted_date
+    pdf_parts = pdf_date.split("-")
+    if len(pdf_parts) != 3:
+        return pdf_date
+    pdf_year, pdf_month, pdf_day = pdf_parts
+    day_val = pdf_day
+    
+    if extracted_date:
+        date_str = str(extracted_date).strip()
+        parts = re.split(r'[-/ ]', date_str)
+        day_str = None
+        if len(parts) == 3:
+            if len(parts[0]) == 4:
+                day_str = parts[2]
+            else:
+                day_str = parts[0]
+        elif len(parts) == 1 and parts[0].isdigit():
+            day_str = parts[0]
+        if day_str and day_str.isdigit():
+            val = int(day_str)
+            if 1 <= val <= 31:
+                day_val = f"{val:02d}"
+                
+    return f"{pdf_year}-{pdf_month}-{day_val}"
+
+
+
 def run_pipeline_on_pdf(pdf_path, pdf_file):
     temp_folder = "temp_images"
     cleaned_folder = "temp_images/cleaned"
     
     # 1. Parse date from filename
     pdf_date = None
+    filename_date_parsed = False
     match = re.search(r"([A-Za-z]+)\s+(\d{1,2}),\s*(\d{4})", pdf_file)
     if match:
         month_name = match.group(1)
@@ -62,6 +94,7 @@ def run_pipeline_on_pdf(pdf_path, pdf_file):
         month_number = datetime.datetime.strptime(month_name, "%B").month
         pdf_date = f"{year}-{month_number:02d}-{day:02d}"
         month_key = f"{year}_{month_number:02d}"
+        filename_date_parsed = True
     else:
         # fallback to current date
         now = datetime.datetime.now()
@@ -82,11 +115,10 @@ def run_pipeline_on_pdf(pdf_path, pdf_file):
     for index, image_path in enumerate(cleaned_images, start=1):
         extracted_data = extract_attendance_from_image(image_path)
         
-        # Use extracted date (fallback to pdf_date)
+        # Use extracted date (fallback/force year & month to pdf_date)
         for row in extracted_data:
             extracted_date = row.get("date")
-            if not extracted_date or not re.match(r"^\d{4}-\d{2}-\d{2}$", str(extracted_date)):
-                row["date"] = pdf_date
+            row["date"] = normalize_row_date(extracted_date, pdf_date, filename_date_parsed)
                 
         all_results.extend(extracted_data)
         
@@ -152,7 +184,10 @@ def upload_file():
         traceback.print_exc()
         if os.path.exists(pdf_path):
             os.remove(pdf_path)
-        return jsonify({"error": str(e)}), 500
+        error_msg = str(e)
+        if "Permission denied" in error_msg or "[Errno 13]" in error_msg:
+            return jsonify({"error": "Permission Denied: The Excel ledger file is currently open in Microsoft Excel. Please close the Excel window and try uploading again."}), 500
+        return jsonify({"error": error_msg}), 500
 
 
 @app.route("/api/attendance", methods=["GET"])
@@ -289,7 +324,10 @@ def save_attendance():
         generate_excel(structured_data, excel_file)
         return jsonify({"ok": True})
     except Exception as e:
-        return jsonify({"error": f"Failed to save excel: {str(e)}"}), 500
+        error_msg = str(e)
+        if "Permission denied" in error_msg or "[Errno 13]" in error_msg:
+            return jsonify({"error": "Permission Denied: The Excel ledger file is currently open in Microsoft Excel. Please close the Excel window and try saving again."}), 500
+        return jsonify({"error": f"Failed to save excel: {error_msg}"}), 500
 
 
 @app.route("/api/files", methods=["GET"])

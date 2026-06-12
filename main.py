@@ -24,6 +24,37 @@ os.makedirs("processed_pdfs", exist_ok=True)
 os.makedirs("output_excels", exist_ok=True)   # FIX: was missing, caused crash on save
 
 
+def normalize_row_date(extracted_date, pdf_date, filename_date_parsed=False):
+    if filename_date_parsed and pdf_date:
+        return pdf_date
+    if not pdf_date:
+        return extracted_date
+    pdf_parts = pdf_date.split("-")
+    if len(pdf_parts) != 3:
+        return pdf_date
+    pdf_year, pdf_month, pdf_day = pdf_parts
+    day_val = pdf_day
+    
+    if extracted_date:
+        date_str = str(extracted_date).strip()
+        parts = re.split(r'[-/ ]', date_str)
+        day_str = None
+        if len(parts) == 3:
+            if len(parts[0]) == 4:
+                day_str = parts[2]
+            else:
+                day_str = parts[0]
+        elif len(parts) == 1 and parts[0].isdigit():
+            day_str = parts[0]
+        if day_str and day_str.isdigit():
+            val = int(day_str)
+            if 1 <= val <= 31:
+                day_val = f"{val:02d}"
+                
+    return f"{pdf_year}-{pdf_month}-{day_val}"
+
+
+
 # INPUT PDF FOLDER
 input_folder = "input_pdfs"
 
@@ -48,6 +79,7 @@ for pdf_file in pdf_files:
     # ==========================================
 
     pdf_date = None
+    filename_date_parsed = False
 
     match = re.search(
         r"([A-Za-z]+)\s+(\d{1,2}),\s*(\d{4})",
@@ -75,6 +107,7 @@ for pdf_file in pdf_files:
         print(
             f"Attendance Date Found: {pdf_date}"
         )
+        filename_date_parsed = True
 
     else:
 
@@ -122,12 +155,11 @@ for pdf_file in pdf_files:
         )
 
         # ==========================================
-        # USE EXTRACTED DATE (FALLBACK TO PDF NAME DATE)
+        # USE EXTRACTED DATE (FALLBACK/FORCE YEAR & MONTH TO PDF NAME DATE)
         # ==========================================
         for row in extracted_data:
             extracted_date = row.get("date")
-            if not extracted_date or not re.match(r"^\d{4}-\d{2}-\d{2}$", str(extracted_date)):
-                row["date"] = pdf_date
+            row["date"] = normalize_row_date(extracted_date, pdf_date, filename_date_parsed)
 
         all_results.extend(
             extracted_data

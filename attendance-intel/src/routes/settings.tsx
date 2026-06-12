@@ -15,7 +15,7 @@ Normalize handwriting variations using fuzzy matching against the canonical list
 
 function SettingsPage() {
   const [apiBase, setApiBase] = useState("https://attendance-flask.onrender.com");
-  const [model, setModel] = useState("claude-3-5-sonnet-20250101");
+  const [model, setModel] = useState("claude-sonnet-4-5-20250929");
   const [prompt, setPrompt] = useState(DEFAULT_PROMPT);
   const [saved, setSaved] = useState(false);
 
@@ -75,9 +75,9 @@ function SettingsPage() {
               onChange={(e) => setModel(e.target.value)}
               className="w-full px-4 py-2.5 rounded-lg border border-border bg-card text-sm outline-none focus:border-[color:var(--emerald-brand)]"
             >
-              <option value="claude-3-5-sonnet-20250101">claude-3-5-sonnet (Recommended)</option>
-              <option value="claude-3-opus-20240229">claude-3-opus (Highest accuracy)</option>
-              <option value="claude-3-haiku-20240307">claude-3-haiku (Fastest)</option>
+              <option value="claude-sonnet-4-5-20250929">claude-sonnet-4-5 (Recommended)</option>
+              <option value="claude-opus-4-5-20251101">claude-opus-4-5 (Highest accuracy)</option>
+              <option value="claude-haiku-4-5-20251001">claude-haiku-4-5 (Fastest)</option>
             </select>
           </Field>
           <Field label="Extraction Prompt" hint="Customize how Claude reads each attendance sheet.">
