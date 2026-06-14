@@ -129,17 +129,25 @@ def process_attendance(all_data):
         }
     )
 
+    last_contractor = "UNKNOWN"
     for row in all_data:
 
-        contractor = row.get("contractor", "UNKNOWN").strip()
-        print("RAW CONTRACTOR:", contractor)
+        contractor = row.get("contractor", "").strip()
+        
+        # Try to normalize the contractor name
+        normalized = normalize_contractor(contractor) if contractor else "UNKNOWN"
+        
+        if normalized in VALID_CONTRACTORS:
+            contractor = normalized
+            last_contractor = normalized
+        else:
+            # If not a valid contractor name, carry forward the previous valid one if we have it
+            if last_contractor != "UNKNOWN":
+                contractor = last_contractor
+            else:
+                contractor = "UNKNOWN"
 
-        # Normalize — fixes OCR mistakes and fuzzy-matches to known names
-        contractor = normalize_contractor(contractor)
-        print("AFTER FIX:     ", contractor)
-
-        if not contractor:
-            contractor = "UNKNOWN"
+        print(f"RAW CONTRACTOR: '{row.get('contractor')}' -> FINAL: '{contractor}'")
 
         shift = row.get("shift", "DAY").strip().upper()
         if shift not in ["DAY", "NIGHT"]:

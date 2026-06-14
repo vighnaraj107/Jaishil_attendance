@@ -57,6 +57,7 @@ Format:
 
 RULES:
 - "contractor" must exactly match one of the known names listed above.
+- IMPORTANT: On some sheets (like Manpower Detail), the contractor name is only written on the first row of a group of employees and is left blank for the subsequent rows in that group. You MUST propagate the last seen contractor name downward to all subsequent rows until a new contractor name is encountered. Every row in the JSON array must have a valid non-empty "contractor" name.
 - "shift" is DAY or NIGHT only.
 - "date" must be YYYY-MM-DD. If year is missing, infer from context.
 - "in_time" and "out_time" in 24-hour HH:MM format.
