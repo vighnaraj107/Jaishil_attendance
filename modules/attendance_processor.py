@@ -1,6 +1,7 @@
 from collections import defaultdict
 from datetime import datetime, timedelta
 from difflib import get_close_matches
+from modules.employee_matcher import correct_employee_name, load_master_list
 
 
 VALID_CONTRACTORS = [
@@ -122,6 +123,9 @@ def calculate_overtime(in_time, out_time):
 
 def process_attendance(all_data):
 
+    # Refresh the worker names master list in case the Excel file was updated
+    load_master_list()
+
     structured = defaultdict(
         lambda: {
             "DAY": defaultdict(dict),
@@ -154,6 +158,7 @@ def process_attendance(all_data):
             shift = "DAY"
 
         employee = row.get("employee_name", "").strip()
+        employee = correct_employee_name(employee)
         date = row.get("date", "")
         in_time = row.get("in_time", "")
         out_time = row.get("out_time", "")
