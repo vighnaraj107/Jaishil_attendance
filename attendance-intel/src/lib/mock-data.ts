@@ -94,7 +94,7 @@ export const mappingRules: MappingRule[] = [
 ];
 
 // --- API hooks placeholders ---
-const API_BASE = (typeof window !== "undefined" && localStorage.getItem("apiBase")) || import.meta.env.VITE_API_URL || import.meta.env.VITE_BACKEND_API_URL || "http://localhost:5000";
+const API_BASE = (typeof window !== "undefined" && localStorage.getItem("apiBase")) || import.meta.env.VITE_API_URL || import.meta.env.VITE_BACKEND_API_URL || "https://jaishil-attendance-1.onrender.com";
 
 export const api = {
   uploadPdf: async (file: File) => {
