@@ -7,6 +7,7 @@ venv/
 env/
 ENV/
 *.xlsx
+!Worker_Information_Bank.xlsx
 *.pdf
 
 # Environment Variables
