@@ -25,8 +25,30 @@ function fmtMinutes(min: number): string {
   return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
 }
 
+function parseMonthFromFilename(name: string): string | null {
+  const match = name.match(/attendance_(\d{4})_(\d{2})\.xlsx/);
+  if (!match) return null;
+  const year = match[1];
+  const monthNum = match[2];
+  const months: Record<string, string> = {
+    "01": "January", "02": "February", "03": "March", "04": "April", "05": "May", "06": "June",
+    "07": "July", "08": "August", "09": "September", "10": "October", "11": "November", "12": "December"
+  };
+  const monthName = months[monthNum];
+  if (!monthName) return null;
+  return `${monthName} ${year}`;
+}
+
 function AttendancePage() {
-  const [month, setMonth] = useState("May 2026");
+  const now = new Date();
+  const currentMonthName = now.toLocaleString("default", { month: "long" });
+  const currentYear = now.getFullYear();
+  const currentMonthStr = `${currentMonthName} ${currentYear}`;
+
+  const [availableMonths, setAvailableMonths] = useState<string[]>([currentMonthStr, "May 2026", "April 2026", "March 2026"]);
+  const [month, setMonth] = useState(() => {
+    return localStorage.getItem("selectedMonth") || currentMonthStr;
+  });
   const [contractorId, setContractorId] = useState<string>("shyam");
   const [shift, setShift] = useState<Shift>("DAY");
   const [data, setData] = useState<any>({});
@@ -34,6 +56,32 @@ function AttendancePage() {
   const [contractorsList, setContractorsList] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+
+  // Sync selected month to localStorage
+  useEffect(() => {
+    localStorage.setItem("selectedMonth", month);
+  }, [month]);
+
+  // Fetch available months from backend
+  useEffect(() => {
+    api.getFiles().then((files) => {
+      const parsed = files
+        .map((f: any) => parseMonthFromFilename(f.name))
+        .filter(Boolean) as string[];
+      
+      const allMonths = Array.from(new Set([currentMonthStr, ...parsed]));
+      const monthOrder = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+      allMonths.sort((a, b) => {
+        const [aName, aYear] = a.split(" ");
+        const [bName, bYear] = b.split(" ");
+        if (aYear !== bYear) return Number(bYear) - Number(aYear);
+        return monthOrder.indexOf(bName) - monthOrder.indexOf(aName);
+      });
+      setAvailableMonths(allMonths);
+    }).catch(err => {
+      console.error("Failed to load available months", err);
+    });
+  }, [currentMonthStr]);
 
   // Fetch data from Flask backend
   useEffect(() => {
@@ -172,11 +220,11 @@ function AttendancePage() {
             <select
               value={month}
               onChange={(e) => setMonth(e.target.value)}
-              className="bg-secondary text-secondary-foreground rounded-lg px-3 py-2 text-sm font-medium border border-border outline-none"
+              className="bg-secondary text-secondary-foreground rounded-lg px-3 py-2 text-sm font-medium border border-border outline-none cursor-pointer"
             >
-              <option value="May 2026">May 2026</option>
-              <option value="April 2026">April 2026</option>
-              <option value="March 2026">March 2026</option>
+              {availableMonths.map((m) => (
+                <option key={m} value={m}>{m}</option>
+              ))}
             </select>
           </div>
           <div className="flex flex-wrap items-center gap-2">

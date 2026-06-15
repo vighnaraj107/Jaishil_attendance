@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useCallback, useRef, useState, useEffect } from "react";
 import {
   Upload, FileText, Users, Building2, Calendar, Download, CheckCircle2,
@@ -6,6 +6,20 @@ import {
 } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { api } from "@/lib/mock-data";
+
+function parseMonthFromFilename(name: string): string | null {
+  const match = name.match(/attendance_(\d{4})_(\d{2})\.xlsx/);
+  if (!match) return null;
+  const year = match[1];
+  const monthNum = match[2];
+  const months: Record<string, string> = {
+    "01": "January", "02": "February", "03": "March", "04": "April", "05": "May", "06": "June",
+    "07": "July", "08": "August", "09": "September", "10": "October", "11": "November", "12": "December"
+  };
+  const monthName = months[monthNum];
+  if (!monthName) return null;
+  return `${monthName} ${year}`;
+}
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -28,18 +42,38 @@ const STEPS = [
 function DashboardPage() {
   const [files, setFiles] = useState<any[]>([]);
   const [filesLoading, setFilesLoading] = useState(true);
+  const [availableMonths, setAvailableMonths] = useState<string[]>([]);
+
+  const now = new Date();
+  const currentMonthName = now.toLocaleString("default", { month: "long" });
+  const currentYear = now.getFullYear();
+  const currentMonthStr = `${currentMonthName} ${currentYear}`;
 
   const loadFiles = useCallback(async () => {
     setFilesLoading(true);
     try {
       const res = await api.getFiles();
       setFiles(res);
+
+      const parsed = res
+        .map((f: any) => parseMonthFromFilename(f.name))
+        .filter(Boolean) as string[];
+
+      const allMonths = Array.from(new Set([currentMonthStr, ...parsed]));
+      const monthOrder = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+      allMonths.sort((a, b) => {
+        const [aName, aYear] = a.split(" ");
+        const [bName, bYear] = b.split(" ");
+        if (aYear !== bYear) return Number(bYear) - Number(aYear);
+        return monthOrder.indexOf(bName) - monthOrder.indexOf(aName);
+      });
+      setAvailableMonths(allMonths);
     } catch (err) {
       console.error(err);
     } finally {
       setFilesLoading(false);
     }
-  }, []);
+  }, [currentMonthStr]);
 
   useEffect(() => {
     loadFiles();
@@ -48,8 +82,8 @@ function DashboardPage() {
   return (
     <AppShell>
       <div className="space-y-8 max-w-[1400px] mx-auto">
-        <Header />
-        <StatsGrid filesCount={files.length} />
+        <Header availableMonths={availableMonths} />
+        <StatsGrid filesCount={files.length} currentMonth={currentMonthStr} />
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
           <div className="lg:col-span-3">
             <Uploader onUploadSuccess={loadFiles} />
@@ -63,7 +97,16 @@ function DashboardPage() {
   );
 }
 
-function Header() {
+function Header({ availableMonths }: { availableMonths: string[] }) {
+  const navigate = useNavigate();
+  const currentMonth = localStorage.getItem("selectedMonth") || availableMonths[0] || "";
+
+  const handleMonthChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const m = e.target.value;
+    localStorage.setItem("selectedMonth", m);
+    navigate({ to: "/attendance" });
+  };
+
   return (
     <div className="flex flex-wrap items-end justify-between gap-4">
       <div>
@@ -79,22 +122,27 @@ function Header() {
       </div>
       <div className="flex items-center gap-2 px-3.5 py-2.5 rounded-xl card-elevated">
         <Calendar className="size-4 text-[color:var(--navy)]" />
-        <select className="bg-transparent text-sm font-medium outline-none">
-          <option>May 2026</option>
-          <option>April 2026</option>
-          <option>March 2026</option>
+        <select 
+          value={currentMonth}
+          onChange={handleMonthChange}
+          className="bg-transparent text-sm font-medium outline-none cursor-pointer"
+        >
+          <option value="" disabled>Select Month...</option>
+          {availableMonths.map((m) => (
+            <option key={m} value={m}>{m}</option>
+          ))}
         </select>
       </div>
     </div>
   );
 }
 
-function StatsGrid({ filesCount }: { filesCount: number }) {
+function StatsGrid({ filesCount, currentMonth }: { filesCount: number, currentMonth: string }) {
   const stats = [
     { label: "Active Contractors", value: 6, hint: "6 vendors onboarded", icon: Building2, accent: "var(--navy)" },
     { label: "Total Employees", value: 48, hint: "48 listed across shifts", icon: Users, accent: "var(--emerald-brand)" },
     { label: "Ledgers Generated", value: filesCount, hint: "Available in output directory", icon: FileText, accent: "var(--teal-brand)", small: false },
-    { label: "Current Month", value: "May 2026", hint: "AI extraction live", icon: Activity, accent: "var(--navy-deep)", small: true },
+    { label: "Current Month", value: currentMonth, hint: "AI extraction live", icon: Activity, accent: "var(--navy-deep)", small: true },
   ];
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
