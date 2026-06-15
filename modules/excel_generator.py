@@ -46,21 +46,39 @@ def parse_existing_sheet(ws):
         if val_1 and val_2 == "IN":
             employee_name = val_1
             employee_data = {}
+            
+            # Determine sheet layout format dynamically
+            has_total_row = (ws.cell(row + 2, 2).value == "TOTAL")
+            ot_offset = 3 if has_total_row else 2
+            total_offset = 2 if has_total_row else None
+            
             for day in range(1, 32):
                 col = day + 2
                 in_time = ws.cell(row, col).value
                 out_time = ws.cell(row + 1, col).value
-                ot_time = ws.cell(row + 2, col).value
+                ot_time = ws.cell(row + ot_offset, col).value
+                total_time = ws.cell(row + total_offset, col).value if total_offset is not None else None
                 
                 # Only save if we have some data for this day
-                if in_time is not None or out_time is not None or ot_time is not None:
+                if in_time is not None or out_time is not None or ot_time is not None or total_time is not None:
+                    formatted_in = format_time_value(in_time)
+                    formatted_out = format_time_value(out_time)
+                    formatted_ot = format_time_value(ot_time)
+                    
+                    if has_total_row:
+                        formatted_total = format_time_value(total_time)
+                    else:
+                        from modules.calculations import calculate_work_hours
+                        formatted_total = calculate_work_hours(formatted_in, formatted_out) if (formatted_in and formatted_out) else ""
+                    
                     employee_data[day] = {
-                        "in": format_time_value(in_time),
-                        "out": format_time_value(out_time),
-                        "ot": format_time_value(ot_time)
+                        "in": formatted_in,
+                        "out": formatted_out,
+                        "work_hours": formatted_total,
+                        "ot": formatted_ot
                     }
             shift_data[current_shift][employee_name] = employee_data
-            row += 4  # skip IN, OUT, OT and the spacer row
+            row += 5 if has_total_row else 4  # skip IN, OUT, (TOTAL), OT and the spacer row
             continue
             
         row += 1
@@ -206,14 +224,15 @@ def generate_excel(structured_data, output_path):
                 ws.merge_cells(
                     start_row=start_row,
                     start_column=1,
-                    end_row=start_row + 2,
+                    end_row=start_row + 3,
                     end_column=1
                 )
                 
                 ws.cell(start_row, 1).value = employee
                 ws.cell(start_row, 2).value = "IN"
                 ws.cell(start_row + 1, 2).value = "OUT"
-                ws.cell(start_row + 2, 2).value = "OT"
+                ws.cell(start_row + 2, 2).value = "TOTAL"
+                ws.cell(start_row + 3, 2).value = "OT"
                 
                 # ──────────────────────────────────────────────────────────────
                 # WRITE DAILY DATA
@@ -222,9 +241,20 @@ def generate_excel(structured_data, output_path):
                     col = day + 2
                     if day in attendance:
                         data = attendance[day]
-                        ws.cell(start_row, col).value = data["in"]
-                        ws.cell(start_row + 1, col).value = data["out"]
-                        ws.cell(start_row + 2, col).value = data["ot"]
+                        in_val = data.get("in", "")
+                        out_val = data.get("out", "")
+                        ot_val = data.get("ot", "")
+                        
+                        # Dynamically calculate work_hours if it's missing but we have in/out
+                        work_hours_val = data.get("work_hours", "")
+                        if in_val and out_val and not work_hours_val:
+                            from modules.calculations import calculate_work_hours
+                            work_hours_val = calculate_work_hours(in_val, out_val)
+                            
+                        ws.cell(start_row, col).value = in_val
+                        ws.cell(start_row + 1, col).value = out_val
+                        ws.cell(start_row + 2, col).value = work_hours_val
+                        ws.cell(start_row + 3, col).value = ot_val
                         
                 # ──────────────────────────────────────────────────────────────
                 # RECALCULATE SUMMARY FROM THE FULL SHEET
@@ -235,7 +265,7 @@ def generate_excel(structured_data, output_path):
                 for day in range(1, 32):
                     col = day + 2
                     in_value = ws.cell(start_row, col).value
-                    ot_value = ws.cell(start_row + 2, col).value
+                    ot_value = ws.cell(start_row + 3, col).value
                     
                     if in_value:
                         total_days += 1
@@ -256,7 +286,7 @@ def generate_excel(structured_data, output_path):
                 ws.cell(start_row, summary_col + 1).value = total_ot
                 ws.cell(start_row, summary_col + 2).value = ot_days
                 
-                current_row += 4
+                current_row += 5
                 
         # ──────────────────────────────────────────────────────────────────────
         # STYLING

@@ -10,8 +10,8 @@ export const Route = createFileRoute("/attendance")({
 });
 
 const DAYS = Array.from({ length: 31 }, (_, i) => i + 1);
-const ROWS: Array<"in" | "out" | "ot"> = ["in", "out", "ot"];
-const ROW_LABEL: Record<string, string> = { in: "IN", out: "OUT", ot: "OT" };
+const ROWS: Array<"in" | "out" | "work_hours" | "ot"> = ["in", "out", "work_hours", "ot"];
+const ROW_LABEL: Record<string, string> = { in: "IN", out: "OUT", work_hours: "TOTAL", ot: "OT" };
 
 function parseHHMM(v?: string): number {
   if (!v) return 0;
@@ -64,11 +64,45 @@ function AttendancePage() {
     }
   }, [contractorsList, contractorId]);
 
-  const updateCell = (empId: string, day: number, row: "in" | "out" | "ot", value: string) => {
-    setData((prev: any) => ({
-      ...prev,
-      [empId]: { ...prev[empId], [day]: { ...prev[empId]?.[day], [row]: value } },
-    }));
+  const updateCell = (empId: string, day: number, row: "in" | "out" | "work_hours" | "ot", value: string) => {
+    setData((prev: any) => {
+      const empData = { ...prev[empId] };
+      const dayData = { ...empData[day], [row]: value };
+      
+      if (row === "in" || row === "out") {
+        const inVal = dayData.in || "";
+        const outVal = dayData.out || "";
+        if (inVal && outVal) {
+          try {
+            const [inH, inM] = inVal.split(":").map(Number);
+            const [outH, outM] = outVal.split(":").map(Number);
+            if (!isNaN(inH) && !isNaN(inM) && !isNaN(outH) && !isNaN(outM)) {
+              let diffMin = (outH * 60 + outM) - (inH * 60 + inM);
+              if (diffMin < 0) diffMin += 24 * 60;
+              const h = Math.floor(diffMin / 60);
+              const m = diffMin % 60;
+              dayData.work_hours = `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+              
+              const otMin = Math.max(0, diffMin - 480);
+              const otH = Math.floor(otMin / 60);
+              const otM = otMin % 60;
+              dayData.ot = `${String(otH).padStart(2, "0")}:${String(otM).padStart(2, "0")}`;
+            }
+          } catch (e) {
+            console.error("Error calculating work hours / OT", e);
+          }
+        } else {
+          dayData.work_hours = "";
+          dayData.ot = "00:00";
+        }
+      }
+      
+      empData[day] = dayData;
+      return {
+        ...prev,
+        [empId]: empData
+      };
+    });
   };
 
   const saveChanges = async () => {
@@ -212,7 +246,7 @@ function AttendancePage() {
                     return ROWS.map((row, ri) => (
                       <tr key={`${emp.id}-${row}`} className={`group ${ri === 0 && idx > 0 ? "border-t-2 border-border" : ""}`}>
                         {ri === 0 && (
-                          <td rowSpan={3} className="sticky left-0 z-10 bg-card px-3 py-2 border-r border-border align-middle">
+                          <td rowSpan={4} className="sticky left-0 z-10 bg-card px-3 py-2 border-r border-border align-middle">
                             <div className="font-semibold text-foreground text-sm">{emp.name}</div>
                             <div className="text-[10px] text-muted-foreground uppercase tracking-wider mt-0.5">
                               {contractorsList.find((c) => c.id === emp.contractorId)?.name.split(" ").slice(0, 2).join(" ")} · {emp.shift}
@@ -239,9 +273,9 @@ function AttendancePage() {
                         })}
                         {ri === 0 && (
                           <>
-                            <td rowSpan={3} className="border-r border-border text-center align-middle font-display font-semibold text-[color:var(--navy)] bg-secondary/40">{totalDays}</td>
-                            <td rowSpan={3} className="border-r border-border text-center align-middle font-mono text-[color:var(--emerald-brand)] bg-secondary/40">{fmtMinutes(totalOtMin)}</td>
-                            <td rowSpan={3} className="text-center align-middle font-mono text-[color:var(--teal-brand)] bg-secondary/40">{otDays}</td>
+                            <td rowSpan={4} className="border-r border-border text-center align-middle font-display font-semibold text-[color:var(--navy)] bg-secondary/40">{totalDays}</td>
+                            <td rowSpan={4} className="border-r border-border text-center align-middle font-mono text-[color:var(--emerald-brand)] bg-secondary/40">{fmtMinutes(totalOtMin)}</td>
+                            <td rowSpan={4} className="text-center align-middle font-mono text-[color:var(--teal-brand)] bg-secondary/40">{otDays}</td>
                           </>
                         )}
                       </tr>

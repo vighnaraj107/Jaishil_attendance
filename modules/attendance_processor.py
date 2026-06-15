@@ -195,31 +195,45 @@ def process_attendance(all_data):
 def update_summary_columns(ws):
 
     max_row = ws.max_row
+    row = 6
+    while row <= max_row:
+        val_1 = ws.cell(row, 1).value
+        val_2 = ws.cell(row, 2).value
+        
+        # Check if shift header
+        if val_1 and "SHIFT" in str(val_1).upper():
+            row += 1
+            continue
+            
+        if val_1 and val_2 == "IN":
+            has_total_row = (ws.cell(row + 2, 2).value == "TOTAL")
+            ot_offset = 3 if has_total_row else 2
+            
+            total_days = 0
+            total_ot_minutes = 0
 
-    for row in range(6, max_row + 1, 4):
+            for col in range(3, 34):
+                in_value = ws.cell(row, col).value
+                ot_value = ws.cell(row + ot_offset, col).value
 
-        total_days = 0
-        total_ot_minutes = 0
+                if in_value:
+                    total_days += 1
 
-        for col in range(3, 34):
+                if ot_value:
+                    try:
+                        h, m = map(int, str(ot_value).split(":"))
+                        total_ot_minutes += h * 60 + m
+                    except:
+                        pass
 
-            ot_value = ws.cell(row + 2, col).value
-            in_value = ws.cell(row, col).value
+            total_ot_hours = total_ot_minutes // 60
+            total_ot_remaining = total_ot_minutes % 60
+            ot_days = round(total_ot_minutes / 60 / 8, 2)
 
-            if in_value:
-                total_days += 1
-
-            if ot_value:
-                try:
-                    h, m = map(int, str(ot_value).split(":"))
-                    total_ot_minutes += h * 60 + m
-                except:
-                    pass
-
-        total_ot_hours = total_ot_minutes // 60
-        total_ot_remaining = total_ot_minutes % 60
-        ot_days = round(total_ot_minutes / 60 / 8, 2)
-
-        ws.cell(row, 34).value = total_days
-        ws.cell(row, 35).value = f"{total_ot_hours:02}:{total_ot_remaining:02}"
-        ws.cell(row, 36).value = ot_days
+            ws.cell(row, 34).value = total_days
+            ws.cell(row, 35).value = f"{total_ot_hours:02}:{total_ot_remaining:02}"
+            ws.cell(row, 36).value = ot_days
+            
+            row += 5 if has_total_row else 4
+            continue
+        row += 1

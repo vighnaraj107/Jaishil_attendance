@@ -250,9 +250,17 @@ def get_attendance():
                         
                         attendance_map[emp_id] = {}
                         for day_num, day_vals in att_data.items():
+                            in_val = day_vals.get("in", "")
+                            out_val = day_vals.get("out", "")
+                            work_hours_val = day_vals.get("work_hours", "")
+                            if in_val and out_val and not work_hours_val:
+                                from modules.attendance_processor import calculate_work_hours
+                                work_hours_val = calculate_work_hours(in_val, out_val)
+                            
                             attendance_map[emp_id][day_num] = {
-                                "in": day_vals.get("in", ""),
-                                "out": day_vals.get("out", ""),
+                                "in": in_val,
+                                "out": out_val,
+                                "work_hours": work_hours_val,
                                 "ot": day_vals.get("ot", "")
                             }
         except Exception as e:
@@ -307,10 +315,11 @@ def save_attendance():
         for day_str, vals in emp_att.items():
             try:
                 day_num = int(day_str)
-                if vals.get("in") or vals.get("out") or vals.get("ot"):
+                if vals.get("in") or vals.get("out") or vals.get("ot") or vals.get("work_hours"):
                     daily_data[day_num] = {
                         "in": vals.get("in", ""),
                         "out": vals.get("out", ""),
+                        "work_hours": vals.get("work_hours", ""),
                         "ot": vals.get("ot", "")
                     }
             except ValueError:

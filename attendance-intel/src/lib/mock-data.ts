@@ -15,10 +15,11 @@ export interface Employee {
   shift: Shift;
 }
 
-// entry per (employeeId, day) -> { in, out, ot }
+// entry per (employeeId, day) -> { in, out, work_hours, ot }
 export interface AttendanceEntry {
   in?: string;
   out?: string;
+  work_hours?: string; // TOTAL
   ot?: string; // HH:MM
 }
 export type AttendanceMap = Record<string, Record<number, AttendanceEntry>>;
@@ -59,6 +60,21 @@ export const employees: Employee[] = [
   { id: "e10", name: "Hari Om", contractorId: "jaishil", shift: "NIGHT" },
 ];
 
+function calculateWorkHours(inStr?: string, outStr?: string): string {
+  if (!inStr || !outStr) return "";
+  try {
+    const [inH, inM] = inStr.split(":").map(Number);
+    const [outH, outM] = outStr.split(":").map(Number);
+    let diffMin = (outH * 60 + outM) - (inH * 60 + inM);
+    if (diffMin < 0) diffMin += 24 * 60;
+    const h = Math.floor(diffMin / 60);
+    const m = diffMin % 60;
+    return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+  } catch {
+    return "";
+  }
+}
+
 function genAttendance(): AttendanceMap {
   const map: AttendanceMap = {};
   const times: Array<[string, string, string]> = [
@@ -72,7 +88,12 @@ function genAttendance(): AttendanceMap {
     map[e.id] = {};
     for (let d = 1; d <= 5; d++) {
       const t = times[(d + e.id.charCodeAt(1)) % times.length];
-      map[e.id][d] = { in: t[0], out: t[1], ot: t[2] };
+      map[e.id][d] = {
+        in: t[0],
+        out: t[1],
+        work_hours: calculateWorkHours(t[0], t[1]),
+        ot: t[2]
+      };
     }
   }
   return map;
