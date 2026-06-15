@@ -58,6 +58,7 @@ Format:
 RULES:
 - "contractor" must exactly match one of the known names listed above.
 - IMPORTANT: On some sheets (like Manpower Detail), the contractor name is only written on the first row of a group of employees and is left blank for the subsequent rows in that group. You MUST propagate the last seen contractor name downward to all subsequent rows until a new contractor name is encountered. Every row in the JSON array must have a valid non-empty "contractor" name.
+- IMPORTANT: On some sheets, the "TIME OUT" (or "TIME IN") column contains ditto marks (like "11", '"', "//", ")", "same as above") indicating it is the same as the row above it. You MUST resolve these ditto marks and output the actual resolved time (e.g. propagate the time from the previous employee's row). Do not return the ditto mark characters.
 - "shift" is DAY or NIGHT only.
 - "date" must be YYYY-MM-DD. If year is missing, infer from context.
 - "in_time" and "out_time" in 24-hour HH:MM format.
@@ -117,5 +118,47 @@ RULES:
 
     data = json.loads(json_text)
     print(f"\nTOTAL ROWS EXTRACTED: {len(data)}\n")
+
+    # Post-process to resolve ditto marks / propagate times downward
+    last_valid_in = ""
+    last_valid_out = ""
+
+    def is_ditto_str(s):
+        if not s:
+            return False
+        s_clean = s.replace(")", "").replace("(", "").strip()
+        if s_clean in ["11", '"', "//", "/", "\\", "same", "same as above", "do", "ditto", "“", "”", "same as"]:
+            return True
+        if all(c in '1/)"\'\\' for c in s_clean):
+            return True
+        return False
+
+    for row in data:
+        in_time = str(row.get("in_time", "")).strip()
+        out_time = str(row.get("out_time", "")).strip()
+
+        # Update last valid times if the current row has explicit valid times
+        if in_time and not is_ditto_str(in_time) and ":" in in_time:
+            last_valid_in = in_time
+        if out_time and not is_ditto_str(out_time) and ":" in out_time:
+            last_valid_out = out_time
+
+        # Resolve ditto marks for IN time
+        if is_ditto_str(in_time):
+            if last_valid_in:
+                row["in_time"] = last_valid_in
+                in_time = last_valid_in
+            else:
+                row["in_time"] = ""
+                in_time = ""
+
+        # Resolve ditto marks or missing values for OUT time
+        # If the employee is present (has a non-empty in_time) but out_time is missing/ditto, propagate
+        if in_time:
+            if not out_time or is_ditto_str(out_time):
+                if last_valid_out:
+                    row["out_time"] = last_valid_out
+                else:
+                    row["out_time"] = ""
 
     return data
