@@ -4,8 +4,10 @@ import shutil
 import hashlib
 import datetime
 import traceback
-from flask import Flask, request, jsonify, send_from_directory
+import uuid
+from flask import Flask, request, jsonify, send_from_directory, send_file, after_this_request
 from flask_cors import CORS
+from modules.google_sheets_generator import save_to_google_sheets
 from dotenv import load_dotenv
 
 from modules.pdf_to_image import convert_pdf_to_images
@@ -123,9 +125,9 @@ def run_pipeline_on_pdf(pdf_path, pdf_file):
         all_results.extend(extracted_data)
         
     # 5. Group results by month
-    primary_excel_file = f"output_excels/attendance_{month_key}.xlsx"
+    primary_excel_file = f"attendance_{month_key}.xlsx"
     if not all_results:
-        generate_excel({}, primary_excel_file)
+        save_to_google_sheets({}, month_key)
     else:
         from collections import defaultdict
         results_by_month = defaultdict(list)
@@ -140,8 +142,7 @@ def run_pipeline_on_pdf(pdf_path, pdf_file):
             
         for row_month_key, group_results in results_by_month.items():
             structured_data = process_attendance(group_results)
-            excel_file = f"output_excels/attendance_{row_month_key}.xlsx"
-            generate_excel(structured_data, excel_file)
+            save_to_google_sheets(structured_data, row_month_key)
             
     # 6. Move PDF safely
     if os.path.exists(pdf_path):
@@ -198,81 +199,13 @@ def get_attendance():
         now = datetime.datetime.now()
         month_key = now.strftime("%Y_%m")
         
-    excel_file = f"output_excels/attendance_{month_key}.xlsx"
-    
-    contractors_list = []
-    employees_list = []
-    attendance_map = {}
-    
-    # Initialize contractors list
-    for c_name, c_info in CONTRACTOR_MAPPING.items():
-        contractors_list.append({
-            "id": c_info["id"],
-            "name": c_name,
-            "employees": 0,
-            "color": c_info["color"]
-        })
-        
-    if os.path.exists(excel_file):
-        try:
-            from openpyxl import load_workbook
-            wb = load_workbook(excel_file, data_only=True)
-            for sheet_name in wb.sheetnames:
-                ws = wb[sheet_name]
-                
-                # Retrieve the full contractor name
-                title_val = ws.cell(1, 1).value
-                contractor_name = sheet_name
-                if title_val and title_val.endswith(" ATTENDANCE"):
-                    contractor_name = title_val[:-11].strip()
-                    
-                c_info = CONTRACTOR_MAPPING.get(contractor_name)
-                c_id = c_info["id"] if c_info else contractor_name.lower().replace(" ", "_")
-                
-                parsed_sheet = parse_existing_sheet(ws)
-                
-                # Set employee count
-                cnt = sum(len(parsed_sheet.get(s, {})) for s in ["DAY", "NIGHT"])
-                for c in contractors_list:
-                    if c["id"] == c_id:
-                        c["employees"] = cnt
-                        
-                for shift_name in ["DAY", "NIGHT"]:
-                    emps = parsed_sheet.get(shift_name, {})
-                    for emp_name, att_data in emps.items():
-                        emp_id = get_employee_id(contractor_name, shift_name, emp_name)
-                        employees_list.append({
-                            "id": emp_id,
-                            "name": emp_name,
-                            "contractorId": c_id,
-                            "shift": shift_name
-                        })
-                        
-                        attendance_map[emp_id] = {}
-                        for day_num, day_vals in att_data.items():
-                            in_val = day_vals.get("in", "")
-                            out_val = day_vals.get("out", "")
-                            work_hours_val = day_vals.get("work_hours", "")
-                            if in_val and out_val and not work_hours_val:
-                                from modules.attendance_processor import calculate_work_hours
-                                work_hours_val = calculate_work_hours(in_val, out_val)
-                            
-                            attendance_map[emp_id][day_num] = {
-                                "in": in_val,
-                                "out": out_val,
-                                "work_hours": work_hours_val,
-                                "ot": day_vals.get("ot", "")
-                            }
-        except Exception as e:
-            traceback.print_exc()
-            return jsonify({"error": f"Error parsing excel file: {str(e)}"}), 500
-            
-    return jsonify({
-        "month": month_key,
-        "contractors": contractors_list,
-        "employees": employees_list,
-        "attendance": attendance_map
-    })
+    from modules.google_sheets_generator import load_attendance_from_google_sheets
+    try:
+        data = load_attendance_from_google_sheets(month_key)
+        return jsonify(data)
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({"error": f"Error loading data from Google Sheets: {str(e)}"}), 500
 
 
 @app.route("/api/attendance/save", methods=["POST", "PUT"])
@@ -328,56 +261,104 @@ def save_attendance():
         if daily_data:
             structured_data[contractor_name][shift][emp_name] = daily_data
             
-    excel_file = f"output_excels/attendance_{month_key}.xlsx"
     try:
-        generate_excel(structured_data, excel_file)
+        save_to_google_sheets(structured_data, month_key)
         return jsonify({"ok": True})
     except Exception as e:
         error_msg = str(e)
-        if "Permission denied" in error_msg or "[Errno 13]" in error_msg:
-            return jsonify({"error": "Permission Denied: The Excel ledger file is currently open in Microsoft Excel. Please close the Excel window and try saving again."}), 500
-        return jsonify({"error": f"Failed to save excel: {error_msg}"}), 500
+        return jsonify({"error": f"Failed to save to Google Sheets: {error_msg}"}), 500
 
 
 @app.route("/api/files", methods=["GET"])
 def get_files():
-    files = []
-    folder = "output_excels"
-    if os.path.exists(folder):
-        for fname in os.listdir(folder):
-            if fname.lower().endswith(".xlsx") and fname.startswith("attendance_"):
-                fpath = os.path.join(folder, fname)
-                stat = os.stat(fpath)
-                mtime = datetime.datetime.fromtimestamp(stat.st_mtime)
-                
-                # Count actual records/rows written
-                record_count = 0
-                try:
-                    from openpyxl import load_workbook
-                    wb = load_workbook(fpath, data_only=True)
-                    for sheet_name in wb.sheetnames:
-                        ws = wb[sheet_name]
-                        parsed_sheet = parse_existing_sheet(ws)
-                        for shift, emps in parsed_sheet.items():
-                            for emp, att_data in emps.items():
-                                record_count += len(att_data)
-                except Exception as e:
-                    print(f"Error counting records for {fname}: {e}")
-                    
-                files.append({
-                    "name": fname,
-                    "size": f"{stat.st_size // 1024} KB",
-                    "generatedAt": mtime.strftime("%b %d, %Y · %H:%M"),
-                    "records": record_count
-                })
-    files.sort(key=lambda x: x["name"], reverse=True)
-    return jsonify(files)
+    from modules.google_sheets_generator import list_google_spreadsheets
+    try:
+        files = list_google_spreadsheets()
+        return jsonify(files)
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({"error": f"Failed to list Google Sheets: {str(e)}"}), 500
 
 
 @app.route("/api/download/<filename>", methods=["GET"])
 def download_file(filename):
-    directory = os.path.abspath("output_excels")
-    return send_from_directory(directory, filename, as_attachment=True)
+    # Parse month_key from filename, e.g. "attendance_2026_05.xlsx"
+    match = re.search(r"attendance_(\d{4}_\d{2})\.xlsx", filename)
+    if not match:
+        return jsonify({"error": "Invalid filename format"}), 400
+    month_key = match.group(1)
+    
+    from modules.google_sheets_generator import load_attendance_from_google_sheets
+    res = load_attendance_from_google_sheets(month_key)
+    
+    # Reconstruct structured_data from res
+    structured_data = {}
+    attendance_data = res.get("attendance", {})
+    employees_list = res.get("employees", [])
+    contractors_list = res.get("contractors", [])
+    
+    for emp in employees_list:
+        emp_id = emp["id"]
+        emp_name = emp["name"]
+        shift = emp["shift"]
+        c_id = emp["contractorId"]
+        
+        contractor_name = "UNKNOWN"
+        for c in contractors_list:
+            if c["id"] == c_id:
+                contractor_name = c["name"]
+                break
+        if contractor_name == "UNKNOWN":
+            contractor_name = REV_CONTRACTOR_MAPPING.get(c_id, c_id)
+            
+        if contractor_name not in structured_data:
+            structured_data[contractor_name] = {"DAY": {}, "NIGHT": {}}
+            
+        emp_att = attendance_data.get(emp_id, {})
+        
+        daily_data = {}
+        for day_str, vals in emp_att.items():
+            try:
+                day_num = int(day_str)
+                if vals.get("in") or vals.get("out") or vals.get("ot") or vals.get("work_hours"):
+                    daily_data[day_num] = {
+                        "in": vals.get("in", ""),
+                        "out": vals.get("out", ""),
+                        "work_hours": vals.get("work_hours", ""),
+                        "ot": vals.get("ot", "")
+                    }
+            except ValueError:
+                continue
+                
+        if daily_data:
+            structured_data[contractor_name][shift][emp_name] = daily_data
+            
+    # Generate unique temp export path
+    temp_id = str(uuid.uuid4())
+    temp_filename = f"temp_export_{temp_id}.xlsx"
+    os.makedirs("temp_exports", exist_ok=True)
+    temp_filepath = os.path.join("temp_exports", temp_filename)
+    
+    @after_this_request
+    def remove_file(response):
+        try:
+            if os.path.exists(temp_filepath):
+                os.remove(temp_filepath)
+        except Exception as e:
+            print(f"Error removing temp file {temp_filepath}: {e}")
+        return response
+        
+    try:
+        generate_excel(structured_data, temp_filepath)
+        return send_file(
+            os.path.abspath(temp_filepath),
+            mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            as_attachment=True,
+            download_name=filename
+        )
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({"error": f"Failed to generate download: {str(e)}"}), 500
 
 
 if __name__ == "__main__":

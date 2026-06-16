@@ -14,6 +14,8 @@ ENV/
 .env
 .env.local
 .env.*.local
+service_account_credentials.json
+
 
 # IDEs and Editors
 .vscode/

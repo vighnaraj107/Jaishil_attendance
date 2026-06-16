@@ -9,7 +9,7 @@ from datetime import datetime
 from modules.pdf_to_image import convert_pdf_to_images
 from modules.image_cleaner import clean_image
 from modules.claude_extractor import extract_attendance_from_image
-from modules.excel_generator import generate_excel
+from modules.google_sheets_generator import save_to_google_sheets
 from modules.attendance_processor import (
     process_attendance
 )
@@ -189,10 +189,9 @@ for pdf_file in pdf_files:
     for c in sorted(raw_contractors):
         print(c)
 
-    # 5. Group results by month and generate Excel
-    primary_excel_file = f"output_excels/attendance_{month_key}.xlsx"
+    # 5. Group results by month and save to Google Sheets
     if not all_results:
-        generate_excel({}, primary_excel_file)
+        save_to_google_sheets({}, month_key)
     else:
         from collections import defaultdict
         results_by_month = defaultdict(list)
@@ -210,8 +209,7 @@ for pdf_file in pdf_files:
             print(f"\nCONTRACTORS FOUND FOR MONTH {row_month_key}:\n")
             for contractor in structured_data.keys():
                 print(contractor)
-            excel_file = f"output_excels/attendance_{row_month_key}.xlsx"
-            generate_excel(structured_data, excel_file)
+            save_to_google_sheets(structured_data, row_month_key)
 
     if os.path.exists(pdf_path):
         dest_path = os.path.join("processed_pdfs", pdf_file)
