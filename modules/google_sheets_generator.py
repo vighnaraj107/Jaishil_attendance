@@ -54,19 +54,36 @@ def get_or_create_spreadsheet(month_key):
         return spreadsheet
     except gspread.SpreadsheetNotFound:
         # Create new spreadsheet
-        spreadsheet = client.create(title)
-        print(f"Created new Google Spreadsheet: {title}")
-        
-        # Share with user if email is set
-        user_email = os.getenv("USER_EMAIL")
-        if user_email:
-            try:
-                spreadsheet.share(user_email, perm_type='user', role='writer')
-                print(f"Shared spreadsheet with {user_email}")
-            except Exception as e:
-                print(f"Warning: Failed to share spreadsheet with {user_email}: {e}")
-                
-        return spreadsheet
+        try:
+            spreadsheet = client.create(title)
+            print(f"Created new Google Spreadsheet: {title}")
+            
+            # Share with user if email is set
+            user_email = os.getenv("USER_EMAIL")
+            if user_email:
+                try:
+                    spreadsheet.share(user_email, perm_type='user', role='writer')
+                    print(f"Shared spreadsheet with {user_email}")
+                except Exception as e:
+                    print(f"Warning: Failed to share spreadsheet with {user_email}: {e}")
+                    
+            return spreadsheet
+        except gspread.exceptions.APIError as e:
+            if "storage quota" in str(e).lower() or "quota" in str(e).lower():
+                service_account_email = "your service account email"
+                # Extract service account email if possible
+                try:
+                    if hasattr(client, 'auth') and hasattr(client.auth, 'signer_email'):
+                        service_account_email = client.auth.signer_email
+                except:
+                    pass
+                raise RuntimeError(
+                    f"Google Drive quota exceeded for the Service Account. "
+                    f"Please resolve this by manually creating a new Google Spreadsheet named '{title}' "
+                    f"in your own personal Google Drive and sharing it with your service account email: "
+                    f"'{service_account_email}' as Editor. The system will then automatically connect and update it."
+                ) from e
+            raise e
 
 def list_google_spreadsheets():
     client = get_gspread_client()
