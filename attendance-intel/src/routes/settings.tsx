@@ -14,7 +14,7 @@ and per-day entries with in_time, out_time, ot_hours. Use 24-hour HH:MM format.
 Normalize handwriting variations using fuzzy matching against the canonical list.`;
 
 function SettingsPage() {
-  const [apiBase, setApiBase] = useState("https://attendance-flask.onrender.com");
+  const [apiBase, setApiBase] = useState("https://jaishil-attendance-1.onrender.com");
   const [model, setModel] = useState("claude-sonnet-4-5-20250929");
   const [prompt, setPrompt] = useState(DEFAULT_PROMPT);
   const [saved, setSaved] = useState(false);
