@@ -57,9 +57,10 @@ Format:
 
 RULES:
 - "contractor" must exactly match one of the known names listed above.
-- IMPORTANT: On some sheets (like Manpower Detail), the contractor name is only written on the first row of a group of employees and is left blank for the subsequent rows in that group. You MUST propagate the last seen contractor name downward to all subsequent rows until a new contractor name is encountered. Every row in the JSON array must have a valid non-empty "contractor" name.
-- IMPORTANT: On some sheets, the "TIME OUT" (or "TIME IN") column contains ditto marks (like "11", '"', "//", ")", "same as above") indicating it is the same as the row above it. You MUST resolve these ditto marks and output the actual resolved time (e.g. propagate the time from the previous employee's row). Do not return the ditto mark characters.
-- "shift" is DAY or NIGHT only.
+- IMPORTANT: Be extremely precise when determining contractor and shift boundaries. On some sheets, the contractor name is only written on the first row of a group of employees. You MUST propagate the last seen contractor name downward to all subsequent rows until a new contractor name is encountered. Do not associate employees with the wrong contractor or group.
+- IMPORTANT: Never misinterpret ditto marks, vertical quotes, or vertical slashes (like "||", "//", '"', "same", etc.) as numbers or actual times (such as "11:00" or "11:11"). You must resolve these ditto marks to the actual time written in the row above (e.g., propagate the time from the previous employee's row).
+- IMPORTANT: Double check the bottom of each page and ensure NO employees are missed. Parse every single row from top to bottom.
+- "shift" is DAY or NIGHT only. Pay close attention to shift changes (DAY SHIFT vs. NIGHT SHIFT) on the page.
 - "date" must be YYYY-MM-DD. If year is missing, infer from context.
 - "in_time" and "out_time" in 24-hour HH:MM format.
 - If a value is truly unreadable, use empty string "".
