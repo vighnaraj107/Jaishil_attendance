@@ -205,7 +205,7 @@ for pdf_file in pdf_files:
             results_by_month[row_month_key].append(row)
 
         for row_month_key, group_results in results_by_month.items():
-            structured_data = process_attendance(group_results)
+            structured_data = process_attendance(group_results, row_month_key)
             print(f"\nCONTRACTORS FOUND FOR MONTH {row_month_key}:\n")
             for contractor in structured_data.keys():
                 print(contractor)

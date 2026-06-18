@@ -141,7 +141,7 @@ def run_pipeline_on_pdf(pdf_path, pdf_file):
             results_by_month[row_month_key].append(row)
             
         for row_month_key, group_results in results_by_month.items():
-            structured_data = process_attendance(group_results)
+            structured_data = process_attendance(group_results, row_month_key)
             save_to_google_sheets(structured_data, row_month_key)
             
     # 6. Move PDF safely

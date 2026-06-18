@@ -121,7 +121,27 @@ def calculate_overtime(in_time, out_time):
         return "00:00"
 
 
-def process_attendance(all_data):
+def match_existing_employee(raw_name, existing_names):
+    if not raw_name or not existing_names:
+        return None
+    try:
+        from rapidfuzz import process, utils
+        match = process.extractOne(
+            raw_name.strip(),
+            existing_names,
+            processor=utils.default_process,
+            score_cutoff=80.0
+        )
+        if match:
+            best_match, score, _ = match
+            print(f"FUZZY MATCH AGAINST GOOGLE SHEET EXISTING: '{raw_name}' -> '{best_match}' (score: {score:.1f}%)")
+            return best_match
+    except Exception as e:
+        print(f"Error executing fuzzy match against existing Google Sheet names: {e}")
+    return None
+
+
+def process_attendance(all_data, month_key=None):
 
     # Refresh the worker names master list in case the Excel file was updated
     load_master_list()
@@ -133,38 +153,69 @@ def process_attendance(all_data):
         }
     )
 
+    # Load existing data from Google Sheets for override matching
+    existing_names = []
+    existing_info = {}
+    if month_key:
+        try:
+            from modules.google_sheets_generator import load_attendance_from_google_sheets, CONTRACTOR_MAPPING
+            REV_CONTRACTOR_MAPPING = {v["id"]: k for k, v in CONTRACTOR_MAPPING.items()}
+            existing = load_attendance_from_google_sheets(month_key)
+            
+            for emp in existing.get("employees", []):
+                name = emp.get("name", "").strip()
+                c_id = emp.get("contractorId", "")
+                shift = emp.get("shift", "DAY")
+                
+                c_name = REV_CONTRACTOR_MAPPING.get(c_id, c_id)
+                existing_names.append(name)
+                existing_info[name] = {"contractor": c_name, "shift": shift}
+        except Exception as e:
+            print(f"Warning: Failed to load existing Google Sheet data for override matching: {e}")
+
     last_contractor = "UNKNOWN"
     for row in all_data:
+        raw_employee = row.get("employee_name", "").strip()
+        if not raw_employee:
+            continue
 
-        contractor = row.get("contractor", "").strip()
+        # 1. Try to match against existing names in the Google Sheet first
+        matched_existing = match_existing_employee(raw_employee, existing_names)
         
-        # Try to normalize the contractor name
-        normalized = normalize_contractor(contractor) if contractor else "UNKNOWN"
-        
-        if normalized in VALID_CONTRACTORS:
-            contractor = normalized
-            last_contractor = normalized
+        if matched_existing:
+            employee = matched_existing
+            info = existing_info[employee]
+            contractor = info["contractor"]
+            shift = info["shift"]
+            print(f"MATCHED EXISTING SHEET WORKER: '{raw_employee}' -> '{employee}' under '{contractor}' ({shift} Shift)")
         else:
-            # If not a valid contractor name, carry forward the previous valid one if we have it
-            if last_contractor != "UNKNOWN":
-                contractor = last_contractor
+            # Fallback to normal parsing and fuzzy matching
+            contractor = row.get("contractor", "").strip()
+            
+            # Try to normalize the contractor name
+            normalized = normalize_contractor(contractor) if contractor else "UNKNOWN"
+            
+            if normalized in VALID_CONTRACTORS:
+                contractor = normalized
+                last_contractor = normalized
             else:
-                contractor = "UNKNOWN"
+                # If not a valid contractor name, carry forward the previous valid one if we have it
+                if last_contractor != "UNKNOWN":
+                    contractor = last_contractor
+                else:
+                    contractor = "UNKNOWN"
 
-        print(f"RAW CONTRACTOR: '{row.get('contractor')}' -> FINAL: '{contractor}'")
+            print(f"RAW CONTRACTOR: '{row.get('contractor')}' -> FINAL: '{contractor}'")
 
-        shift = row.get("shift", "DAY").strip().upper()
-        if shift not in ["DAY", "NIGHT"]:
-            shift = "DAY"
+            shift = row.get("shift", "DAY").strip().upper()
+            if shift not in ["DAY", "NIGHT"]:
+                shift = "DAY"
 
-        employee = row.get("employee_name", "").strip()
-        employee = correct_employee_name(employee)
+            employee = correct_employee_name(raw_employee)
+
         date = row.get("date", "")
         in_time = row.get("in_time", "")
         out_time = row.get("out_time", "")
-
-        if not employee:
-            continue
 
         if not date:
             continue
