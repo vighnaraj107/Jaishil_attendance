@@ -242,6 +242,9 @@ def load_attendance_from_google_sheets(month_key):
             "color": c_info["color"]
         })
         
+    needs_save = False
+    recalculated_structured_data = {}
+    
     try:
         worksheets = spreadsheet.worksheets()
         for ws in worksheets:
@@ -278,6 +281,8 @@ def load_attendance_from_google_sheets(month_key):
                     "color": "var(--slate-cool)"
                 })
                 
+            recalculated_structured_data[matched_c_name] = {"DAY": {}, "NIGHT": {}}
+            
             for shift_name in ["DAY", "NIGHT"]:
                 emps = parsed_sheet.get(shift_name, {})
                 for emp_name, att_data in emps.items():
@@ -290,20 +295,39 @@ def load_attendance_from_google_sheets(month_key):
                     })
                     
                     attendance_map[emp_id] = {}
+                    employee_day_data = {}
                     for day_num, day_vals in att_data.items():
                         in_val = day_vals.get("in", "")
                         out_val = day_vals.get("out", "")
                         work_hours_val = day_vals.get("work_hours", "")
-                        if in_val and out_val and not work_hours_val:
-                            from modules.calculations import calculate_work_hours
-                            work_hours_val = calculate_work_hours(in_val, out_val)
+                        ot_val = day_vals.get("ot", "")
+                        
+                        from modules.calculations import calculate_work_hours, calculate_overtime
+                        if in_val and out_val:
+                            calc_work_hours = calculate_work_hours(in_val, out_val)
+                            calc_ot = calculate_overtime(calc_work_hours)
+                        else:
+                            calc_work_hours = ""
+                            calc_ot = ""
                             
-                        attendance_map[emp_id][day_num] = {
+                        if calc_work_hours != work_hours_val or calc_ot != ot_val:
+                            needs_save = True
+                            
+                        day_entry = {
                             "in": in_val,
                             "out": out_val,
-                            "work_hours": work_hours_val,
-                            "ot": day_vals.get("ot", "")
+                            "work_hours": calc_work_hours,
+                            "ot": calc_ot
                         }
+                        attendance_map[emp_id][day_num] = day_entry
+                        employee_day_data[day_num] = day_entry
+                        
+                    recalculated_structured_data[matched_c_name][shift_name][emp_name] = employee_day_data
+                    
+        if needs_save:
+            print("Mismatch/changes detected in Google Sheet timings. Recalculating and saving back to Google Sheets...")
+            save_to_google_sheets(recalculated_structured_data, month_key)
+            
     except Exception as e:
         print(f"Error parsing google worksheets: {e}")
         
@@ -534,11 +558,12 @@ def save_to_google_sheets(structured_data, month_key):
                     },
                     "cell": {
                         "userEnteredFormat": {
-                            "alignment": {"horizontal": "CENTER", "vertical": "MIDDLE"},
+                            "horizontalAlignment": "CENTER",
+                            "verticalAlignment": "MIDDLE",
                             "textFormat": {"fontSize": 10, "fontFamily": "Roboto"}
                         }
                     },
-                    "fields": "userEnteredFormat.alignment,userEnteredFormat.textFormat"
+                    "fields": "userEnteredFormat.horizontalAlignment,userEnteredFormat.verticalAlignment,userEnteredFormat.textFormat"
                 }
             })
             
